@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Lifecycle Engine"
+  short_description: "Create, improve, optimize, and maintain Codex skills"
+  default_prompt: "Use $skill-lifecycle-engine to create or improve a complete Codex skill package."
