@@ -1,83 +1,64 @@
-# Fallback Protocol
+# Fallback Protocol / 故障处理协议
 
-## Read This On First Failure
+Two layers: the **Agent layer** controls the agent, the **User layer** is copy-ready text for the user. Read this file at the first failure of any command, script, dependency lookup or audit.
 
-If any command, script, dependency lookup, or validation step fails, stop and read this file before trying alternative tools or edits.
+## Layer 1: Agent Intervention / Agent 拦截指令
 
-## Agent Intervention
+`⚠️` Stop the task at the first failure. Then:
 
-When a failure occurs, do not:
+Forbidden:
 
-- rewrite unrelated scripts to force success
-- copy authentication logic from another skill
-- install random dependencies without evidence
-- swap to a different unsafe workflow just to get an output
-- silently degrade the task without telling the user
+- editing scripts or local tests just to make them pass
+- swapping to a different tool or an unsafe fallback
+- installing guessed dependencies without evidence
+- copying authentication logic from another skill
+- silently degrading or skipping the task without telling the user
 
-Correct behavior:
+Required:
 
-1. Identify the exact failing command, file, or dependency.
-2. Determine whether the failure is structural, environmental, or content-related.
-3. Apply the smallest safe fix.
-4. If the fix requires user action or external state, present a direct recovery instruction.
+1. Identify the exact failing command, file or text.
+2. Classify it as structural, environmental or content-related.
+3. Apply the smallest safe fix only when the cause is in the skill's own files.
+4. If user action or external state is needed, present the matching User Fix below verbatim and wait for the reply "已修复".
 
-## User-Facing Recovery Pattern
+## Layer 2: Errors and User Fixes / 错误现象与用户修复
 
-When user intervention is required, present:
+### E1 `[FAIL] description is N chars; hard limit is 1024`
 
-1. The exact problem.
-2. The exact command or action needed.
-3. A request to reply after completion.
+Cause: the description exceeds the VS Code limit; the skill may not load in Copilot Chat.
 
-Example:
+Agent fix: shorten it (merge duplicated bilingual sentences, cut repeated synonyms), keep "when to use" and "do not use", re-run the audit. No user action needed.
+
+### E2 `[FAIL] SKILL.md has no valid YAML frontmatter` / `name ... must match folder name`
+
+Agent fix: restore `---` delimiters; set `name` equal to the folder name in lowercase hyphen-case. Re-run the audit.
+
+### E3 `[FAIL] SKILL.md references missing path: <path>`
+
+Agent fix: create the missing file or correct the path. Re-run the audit.
+
+### E4 Python or script execution error (path, encoding, missing interpreter)
+
+Agent fix: inspect the failing script, patch only the cause, re-run the exact command. If `python` is unavailable, show:
 
 ```text
-The skill validation failed because SKILL.md is missing valid YAML frontmatter.
-Please restore or update the frontmatter, then reply with: 已修复
+Detected: Python is not available, so the audit cannot run.
+Please install Python 3 or add it to PATH, then reply: 已修复
 ```
 
-## Common Failures
+### E5 Skill installed but not found in Copilot Chat
 
-### Validation failure
+Show the user:
 
-Symptoms:
-
-- missing `SKILL.md`
-- invalid frontmatter
-- invalid skill name
-- missing description
-
-Response:
-
-1. Fix the specific file.
-2. Re-run validation.
-
-### Missing support files
-
-Symptoms:
-
-- references mentioned in `SKILL.md` do not exist
-- `agents/openai.yaml` is stale or absent
-
-Response:
-
-1. Create the missing files.
-2. Ensure file references match exact paths.
-
-### Script failure
-
-Symptoms:
-
-- Python execution error
-- bad path resolution
-- encoding mismatch
-
-Response:
-
-1. Inspect the failing script.
-2. Patch only the cause.
-3. Re-run the exact command.
+```text
+Detected: the skill is not listed in Copilot Chat.
+Please check, in order:
+1. The folder is under .github/skills/, .agents/skills/, .claude/skills/ (project) or ~/.copilot/skills/, ~/.agents/skills/, ~/.claude/skills/ (personal).
+2. The audit prints no [FAIL] (especially description <= 1024 chars).
+3. Run Developer: Reload Window, then type /skills in chat.
+Reply: 已修复
+```
 
 ## Why This Matters
 
-This protocol prevents wasteful improvisation loops. Good fallback behavior is part of the skill design, not an afterthought.
+Without a circuit breaker the agent enters improvisation loops that inflate token cost and push the context toward truncation.

@@ -5,12 +5,12 @@
 User request:
 
 ```text
-通过参考这份文档，帮我创建一个完整的 Codex skill，包含 SKILL.md、references、scripts 和维护流程。
+通过参考这份文档，帮我创建一个完整的 skill，包含 SKILL.md、references、scripts 和维护流程。
 ```
 
 Why this skill should trigger:
 
-- explicit request to create a Codex skill
+- explicit request to create a skill
 - asks for complete skill structure
 - asks for maintenance workflow
 
@@ -26,6 +26,18 @@ Why this skill should trigger:
 
 - focuses on skill optimization
 - requests progressive disclosure refactor
+
+## Example 4
+
+User request:
+
+```text
+我的 skill 在 Copilot Chat 里找不到，帮我检查 description 和目录。
+```
+
+Why this skill should trigger:
+
+- debugging skill discovery and frontmatter limits (description <= 1024 chars)
 
 ## Example 3
 
