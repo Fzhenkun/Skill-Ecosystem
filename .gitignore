@@ -1,0 +1,23 @@
+# Local agent/workspace artifacts
+.agents/
+.codex/
+.codegraph/
+.cursor/rules/codegraph.mdc
+.playwright-mcp/
+sync-button-*.png
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.suo
+*.user
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Build output
+dist/
