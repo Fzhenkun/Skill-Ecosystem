@@ -150,6 +150,55 @@ function Get-ManagedSkillTrackerServerProcesses {
     })
 }
 
+function Get-AnySkillTrackerServerProcessesOnPort {
+    param([int]$ListenPort)
+
+    if ($RunningOnWindows) {
+        $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    } else {
+        $processes = @()
+        foreach ($process in @(Get-Process -ErrorAction SilentlyContinue)) {
+            $processes += [pscustomobject]@{
+                ProcessId = [int]$process.Id
+                CommandLine = Get-ProcessCommandLine -ProcessId $process.Id
+            }
+        }
+    }
+
+    return @($processes | Where-Object {
+        $commandLine = [string]$_.CommandLine
+        $_.ProcessId -ne $PID -and
+        $commandLine -and
+        $commandLine.IndexOf("start-dashboard.ps1", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $commandLine.IndexOf("-Server", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $commandLine.IndexOf("-Port", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $commandLine.IndexOf($ListenPort.ToString(), [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+}
+
+function Get-AnySkillTrackerServerProcesses {
+    if ($RunningOnWindows) {
+        $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    } else {
+        $processes = @()
+        foreach ($process in @(Get-Process -ErrorAction SilentlyContinue)) {
+            $processes += [pscustomobject]@{
+                ProcessId = [int]$process.Id
+                CommandLine = Get-ProcessCommandLine -ProcessId $process.Id
+            }
+        }
+    }
+
+    return @($processes | Where-Object {
+        $commandLine = [string]$_.CommandLine
+        $_.ProcessId -ne $PID -and
+        $commandLine -and
+        $commandLine.IndexOf("start-dashboard.ps1", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+        $commandLine.IndexOf("-Server", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    })
+}
+
+
 function Stop-ManagedSkillTrackerServers {
     param([int]$ListenPort)
 
@@ -200,6 +249,18 @@ function Test-SkillTrackerServer {
     }
 }
 
+function Test-AnySkillTrackerServer {
+    param([int]$ListenPort)
+
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$ListenPort/index.html" -UseBasicParsing -TimeoutSec 2
+        return $response.StatusCode -eq 200 -and
+            $response.Headers["X-Skill-Tracker-Server"] -eq "1"
+    } catch {
+        return $false
+    }
+}
+
 function Wait-SkillTrackerServer {
     param(
         [int]$ListenPort,
@@ -224,6 +285,70 @@ function Test-AnyHttpServer {
     } catch {
         return $false
     }
+}
+
+function Get-ListeningProcessIdsOnPort {
+    param([int]$ListenPort)
+
+    if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
+        $netTcpPids = @(Get-NetTCPConnection -LocalPort $ListenPort -State Listen -ErrorAction SilentlyContinue |
+            Where-Object { $_.OwningProcess -and [int]$_.OwningProcess -notin @($PID, 4) } |
+            Select-Object -ExpandProperty OwningProcess -Unique)
+        if ($netTcpPids.Count -gt 0) { return $netTcpPids }
+    }
+
+    if ($RunningOnWindows -and (Get-Command netstat -ErrorAction SilentlyContinue)) {
+        $netstatPattern = '^\s*TCP\s+\S+:' + [regex]::Escape($ListenPort.ToString()) + '\s+\S+\s+LISTENING\s+(\d+)\s*$'
+        $netstatPids = @(& netstat -ano -p tcp 2>$null | ForEach-Object {
+            if ($_ -match $netstatPattern) {
+                $pidValue = [int]$Matches[1]
+                if ($pidValue -notin @($PID, 4)) { $pidValue }
+            }
+        } | Select-Object -Unique)
+        if ($netstatPids.Count -gt 0) { return $netstatPids }
+    }
+
+    if (Get-Command lsof -ErrorAction SilentlyContinue) {
+        return @(& lsof -nP -ti "tcp:$ListenPort" -sTCP:LISTEN 2>$null |
+            ForEach-Object {
+                [int]$pidValue = 0
+                if ([int]::TryParse([string]$_, [ref]$pidValue) -and $pidValue -ne $PID) { $pidValue }
+            } | Select-Object -Unique)
+    }
+
+    return @()
+}
+
+function Stop-ListeningProcessesOnPort {
+    param([int]$ListenPort)
+
+    $pids = @(Get-ListeningProcessIdsOnPort -ListenPort $ListenPort)
+    if ($pids.Count -eq 0) {
+        $pids = @(Get-AnySkillTrackerServerProcessesOnPort -ListenPort $ListenPort | Select-Object -ExpandProperty ProcessId -Unique)
+    }
+    if ($pids.Count -eq 0) {
+        $pids = @(Get-AnySkillTrackerServerProcesses | Select-Object -ExpandProperty ProcessId -Unique)
+    }
+    if ($env:SKILL_TRACKER_DEBUG) {
+        Write-Host "Port $ListenPort stop candidates: $($pids -join ', ')"
+        foreach ($candidate in @(Get-AnySkillTrackerServerProcesses)) {
+            Write-Host "  server process $($candidate.ProcessId): $($candidate.CommandLine)"
+        }
+    }
+    if ($pids.Count -eq 0) { return $false }
+    foreach ($pidValue in $pids) {
+        Stop-Process -Id ([int]$pidValue) -Force -ErrorAction SilentlyContinue
+    }
+
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+        $remainingTargetPids = @($pids | Where-Object { Get-Process -Id ([int]$_) -ErrorAction SilentlyContinue })
+        if ($remainingTargetPids.Count -eq 0 -and -not (Test-AnyHttpServer -ListenPort $ListenPort)) { return $true }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    $remainingTargetPids = @($pids | Where-Object { Get-Process -Id ([int]$_) -ErrorAction SilentlyContinue })
+    return $remainingTargetPids.Count -eq 0 -and -not (Test-AnyHttpServer -ListenPort $ListenPort)
 }
 
 function Start-NoCacheServer {
@@ -525,6 +650,11 @@ if (-not (Test-SkillTrackerServer -ListenPort $Port)) {
         } while ((Get-Date) -lt $stopDeadline)
         if (Test-AnyHttpServer -ListenPort $Port) {
             throw "The previous Skill Tracker server on port $Port is still responding."
+        }
+    } elseif (Test-AnySkillTrackerServer -ListenPort $Port) {
+        Write-Host "Replacing an existing Skill Tracker server on port $Port..."
+        if (-not (Stop-ListeningProcessesOnPort -ListenPort $Port)) {
+            throw "The existing Skill Tracker server on port $Port could not be stopped."
         }
     } elseif (Test-AnyHttpServer -ListenPort $Port) {
         throw "Port $Port is already used by another local server. Stop that server or choose another port."

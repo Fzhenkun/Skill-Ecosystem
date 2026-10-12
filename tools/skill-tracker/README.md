@@ -165,7 +165,7 @@ Skill Tracker currently detects common local paths for:
 | Baidu Comate / 文心快码 | `%APPDATA%/Code/User/globalStorage/BaiduComate.BaiduComate/`, `%APPDATA%/Comate/logs/` |
 | Continue | `~/.continue/sessions/` |
 | Gemini CLI | `~/.gemini/sessions/` |
-| GitHub Copilot | `%APPDATA%/Code/User/globalStorage/github.copilot-chat/`, `%APPDATA%/Code/User/workspaceStorage/` |
+| GitHub Copilot | `~/.copilot/session-state/`, `%APPDATA%/Code/User/globalStorage/github.copilot-chat/`, `%APPDATA%/Code/User/workspaceStorage/` |
 | Goose | `~/.config/goose/sessions/`, `~/.local/share/goose/sessions/` |
 | Hermes | `~/.hermes/sessions/`, `~/.hermes/logs/` |
 | DeepSeek Harness (`dsh`) | `~/.dsh/sessions/` by default, or `DSH_SESSION_ROOT`; JSONL session trees and `~/.dsh/logs/` |

@@ -65,6 +65,7 @@ $codexHome = if ($env:CODEX_HOME) {
 } else {
     [System.IO.Path]::Combine($userHome, ".codex")
 }
+$copilotSessionStateRoot = [System.IO.Path]::Combine($userHome, ".copilot", "session-state")
 $dshSessionRoot = if ($env:DSH_SESSION_ROOT) {
     Resolve-ConfiguredPath -Path ([string]$env:DSH_SESSION_ROOT) -BaseDirectory (Get-Location).Path
 } else {
@@ -153,6 +154,7 @@ $skillRootCandidates = @(
     (Join-SkillTrackerPath $codexHome "plugins" "cache"),
     (Join-SkillTrackerPath $userHome ".agents" "skills"),
     (Join-SkillTrackerPath $userHome ".config" "agents" "skills"),
+    (Join-SkillTrackerPath $userHome ".copilot" "skills"),
     (Join-SkillTrackerPath $userHome ".claude" "skills"),
     (Join-SkillTrackerPath $userHome ".hermes" "skills"),
     (Join-SkillTrackerPath $userHome ".cursor" "skills"),
@@ -310,7 +312,7 @@ $AUTO_DETECT_TOOLS = @(
     @{ Name="Baidu Comate"; Paths=@((Get-EditorGlobalStoragePaths -ExtensionIds @("BaiduComate.BaiduComate","baiducomate.baiducomate")) + @((Join-SkillTrackerPath $appData "Comate" "logs"),(Join-SkillTrackerPath $localAppData "Comate" "logs"),(Join-SkillTrackerPath $appData "BaiduComate" "logs"),(Join-SkillTrackerPath $localAppData "BaiduComate" "logs"),(Join-SkillTrackerPath $appData "Baidu" "Comate" "logs"),(Join-SkillTrackerPath $localAppData "Baidu" "Comate" "logs"))); TsField="timestamp"; Id="baidu-comate"; Aliases=@("comate","baiducomate","文心快码"); Publisher="Baidu"; RuntimeKind="ide_extension"; ProviderHints=@("Baidu") },
     @{ Name="Continue";    Paths=@((Join-SkillTrackerPath $userHome ".continue" "sessions")); TsField="timestamp" },
     @{ Name="Gemini CLI";  Paths=@((Join-SkillTrackerPath $userHome ".gemini" "sessions")); TsField="created_at" },
-    @{ Name="GitHub Copilot"; Paths=@(Get-EditorGlobalStoragePaths -ExtensionIds @("github.copilot-chat","github.copilot")); TsField="timestamp" },
+    @{ Name="GitHub Copilot"; Paths=@($copilotSessionStateRoot) + @(Get-EditorGlobalStoragePaths -ExtensionIds @("github.copilot-chat","github.copilot")); TsField="timestamp" },
     @{ Name="Goose";       Paths=@((Join-SkillTrackerPath $userHome ".config" "goose" "sessions"),(Join-SkillTrackerPath $userHome ".local" "share" "goose" "sessions"),(Join-SkillTrackerPath $userHome ".local" "state" "goose" "logs"),(Join-SkillTrackerPath $appData "goose" "sessions"),(Join-SkillTrackerPath $appData "goose" "logs")); TsField="timestamp" },
     @{ Name="Hermes";      Paths=@((Join-SkillTrackerPath $userHome ".hermes" "sessions"),(Join-SkillTrackerPath $userHome ".hermes" "logs"),(Join-SkillTrackerPath $appData "Hermes" "logs"),(Join-SkillTrackerPath $localAppData "Hermes" "logs")); TsField="timestamp"; Aliases=@("hermes-agent") },
     @{ Name="DeepSeek Harness"; Paths=@($dshSessionRoot,(Join-SkillTrackerPath $userHome ".dsh" "logs"),(Join-SkillTrackerPath $appData "dsh" "sessions"),(Join-SkillTrackerPath $appData "dsh" "logs"),(Join-SkillTrackerPath $localAppData "dsh" "sessions"),(Join-SkillTrackerPath $localAppData "dsh" "logs")); TsField="time"; Id="deepseek-harness"; Aliases=@("DeepSeekHarness","deepseekharness","deepseek-harness","dsh"); Publisher="DeepSeek AI"; RuntimeKind="agent_harness"; ProviderHints=@("DeepSeek") },
@@ -338,7 +340,7 @@ $toolInstallPolicies = @{
     "Augment" = @{ InstallPathPatterns=@(Get-EditorExtensionInstallPatterns -ExtensionIds @("augment.vscode-augment","augment.vscode-augment-nightly")) }
     "ClaudeCode" = @{ CommandNames=@("claude"); InstallPaths=@(Get-CommandInstallPaths -CommandNames @("claude")) }
     "Cline" = @{ InstallPathPatterns=@(Get-EditorExtensionInstallPatterns -ExtensionIds @("saoudrizwan.claude-dev","cline.cline")) }
-    "Codex" = @{ CommandNames=@("codex"); ProcessNames=@("codex"); InstallPaths=@((Join-SkillTrackerPath $localAppData "OpenAI" "Codex")) + @(Get-CommandInstallPaths -CommandNames @("codex")) }
+    "Codex" = @{ InstallPaths=@((Join-SkillTrackerPath $codexHome "sessions")) }
     "WorkBuddy" = @{ CommandNames=@("workbuddy"); ProcessNames=@("WorkBuddy"); InstallPaths=@((Join-SkillTrackerPath $localAppData "Programs" "WorkBuddy" "WorkBuddy.exe"),(Join-SkillTrackerPath $localAppData "WorkBuddy" "WorkBuddy.exe"),(Join-SkillTrackerPath $appData "WorkBuddy" "WorkBuddy.exe")) + @(Get-CommandInstallPaths -CommandNames @("workbuddy")) }
     "CodeBuddy" = @{ CommandNames=@("codebuddy"); ProcessNames=@("CodeBuddy"); InstallPaths=@((Join-SkillTrackerPath $localAppData "Programs" "CodeBuddy" "CodeBuddy.exe"),(Join-SkillTrackerPath $localAppData "CodeBuddy" "CodeBuddy.exe"),(Join-SkillTrackerPath $appData "CodeBuddy" "CodeBuddy.exe")) + @(Get-CommandInstallPaths -CommandNames @("codebuddy")) }
     "Qoder" = @{ CommandNames=@("qoder","qoder-cn","lingma"); ProcessNames=@("Qoder","Lingma"); InstallPaths=@((Join-SkillTrackerPath $localAppData "Programs" "Qoder" "Qoder.exe"),(Join-SkillTrackerPath $localAppData "Qoder" "Qoder.exe"),(Join-SkillTrackerPath $localAppData "Programs" "Lingma" "Lingma.exe"),(Join-SkillTrackerPath $localAppData "Lingma" "Lingma.exe")) + @(Get-CommandInstallPaths -CommandNames @("qoder","qoder-cn","lingma")) }
@@ -346,7 +348,7 @@ $toolInstallPolicies = @{
     "Baidu Comate" = @{ InstallPathPatterns=@(Get-EditorExtensionInstallPatterns -ExtensionIds @("BaiduComate.BaiduComate","baiducomate.baiducomate")) }
     "Continue" = @{ InstallPathPatterns=@(Get-EditorExtensionInstallPatterns -ExtensionIds @("continue.continue")) }
     "Gemini CLI" = @{ CommandNames=@("gemini"); InstallPaths=@(Get-CommandInstallPaths -CommandNames @("gemini")) }
-    "GitHub Copilot" = @{ InstallPathPatterns=@(Get-EditorExtensionInstallPatterns -ExtensionIds @("github.copilot-chat","github.copilot")) }
+    "GitHub Copilot" = @{ InstallPaths=@($copilotSessionStateRoot) }
     "Goose" = @{ CommandNames=@("goose"); InstallPaths=@(Get-CommandInstallPaths -CommandNames @("goose")) }
     "Hermes" = @{ CommandNames=@("hermes"); ProcessNames=@("hermes"); InstallPaths=@((Join-SkillTrackerPath $userHome ".hermes" "bin" "hermes"),(Join-SkillTrackerPath $userHome ".hermes" "bin" "hermes.exe"),(Join-SkillTrackerPath $userHome ".hermes" "bin" "hermes.cmd")) + @(Get-CommandInstallPaths -CommandNames @("hermes")) }
     "DeepSeek Harness" = @{ CommandNames=@("dsh"); ProcessNames=@("dsh"); InstallPaths=@((Join-SkillTrackerPath $userHome ".dsh" "bin" "dsh"),(Join-SkillTrackerPath $userHome ".dsh" "bin" "dsh.cmd"),(Join-SkillTrackerPath $userHome ".dsh" "bin" "dsh.ps1")) + @(Get-CommandInstallPaths -CommandNames @("dsh")); InstallPathPatterns=@(Get-NpmPackageInstallPatterns -PackageNames @("@deepseek-ai/dsh")) }
@@ -615,7 +617,7 @@ $pidPath = Join-Path $cfg.output_dir ".collector.pid"
 $heartbeatPath = Join-Path $cfg.output_dir ".collector-heartbeat.json"
 $triggerPath = Join-Path $cfg.output_dir ".collector.trigger"
 $cachePath = Join-Path $cfg.output_dir ".collector-cache.json"
-$collectorCacheVersion = 4
+$collectorCacheVersion = 5
 $heartbeatMaxAgeSeconds = 90
 $heartbeatIntervalSeconds = 5
 $watcherMutex = $null
@@ -1084,6 +1086,8 @@ $claudeAttributionSkillRx = [System.Text.RegularExpressions.Regex]'"attributionS
 $slashSkillRx = [System.Text.RegularExpressions.Regex]'(?m)^\s*/([A-Za-z0-9][A-Za-z0-9:_\-]*)(?=\s|$)'
 $commandNameSkillRx = [System.Text.RegularExpressions.Regex]'(?is)<command-name>\s*/([A-Za-z0-9][A-Za-z0-9:_\-]*)\s*</command-name>'
 $userRequestRx = [System.Text.RegularExpressions.Regex]'(?is)<USER_REQUEST>\s*(.*?)\s*</USER_REQUEST>'
+$skillTagNameRx = [System.Text.RegularExpressions.Regex]'(?is)<skill>\s*<name>\s*([A-Za-z0-9][A-Za-z0-9:_\-]*)\s*</name>'
+$skillTagPathRx = [System.Text.RegularExpressions.Regex]'(?is)<path>\s*(?<path>[^<]*[/\\]SKILL\.md)\s*</path>'
 $directSkillViewPathRx = [System.Text.RegularExpressions.Regex]'(?im)^\s*File Path:\s*`?(?:file:)?[^`\r\n]*[/\\]SKILL\.md`?\s*$'
 $directSkillViewPathExtractRx = [System.Text.RegularExpressions.Regex]'(?im)^\s*File Path:\s*`?(?:file:)?(?<path>[^`\r\n]*[/\\]SKILL\.md)`?\s*$'
 $timeRx   = [System.Text.RegularExpressions.Regex]'"(?:created_at|timestamp|time)"\s*:\s*"([^"]+)"'
@@ -1218,6 +1222,8 @@ function Add-LogLineChunk {
     # a concrete skill/path/timestamp/command token needs semantic extraction.
     $hasStructuredSlashCommand = $scanText -match '(?i)"(?:text|content|message)"\s*:\s*"[^"\r\n]*\/[A-Za-z0-9]'
     $hasStructuredUserMessage = ($scanText -match '(?i)"type"\s*:\s*"message"') -and $hasUserRoleToken
+    $hasStructuredSkillEvent = ($scanText -match '(?i)"type"\s*:\s*"skill\.invoked"') -or
+        $scanText.Contains('skills.selected_skill_instructions')
     $hasCommandToken = $scanText.Contains('<command-name>') -or
         $scanText.Contains('<USER_REQUEST>') -or
         $scanText.Contains('"/') -or
@@ -1228,7 +1234,7 @@ function Add-LogLineChunk {
         $scanText.Contains('"timestamp"') -or
         $scanText.Contains('"time"') -or
         $scanText.Contains('"ts"')
-    $needsSemanticScan = $hasSkillFileToken -or $hasCommandToken -or
+    $needsSemanticScan = $hasSkillFileToken -or $hasCommandToken -or $hasStructuredSkillEvent -or
         ($State.Length -gt $maxSignalLineChars -and $hasTimestampToken)
     if ($needsSemanticScan) {
         if (-not $State.Timestamp) {
@@ -1248,11 +1254,42 @@ function Add-LogLineChunk {
         foreach ($match in $skillPathRx.Matches($scanText)) {
             Add-LogLineSkillPath -State $State -Skill $match.Groups['skill'].Value -Path $match.Groups['path'].Value
         }
+        if ($State.HasReadMarker) {
+            foreach ($match in $skillFileReadRx.Matches($scanText)) {
+                Add-LogLineSkillName -State $State -Skill $match.Groups[2].Value
+            }
+        }
         foreach ($match in $directSkillViewPathExtractRx.Matches($scanText)) {
             $path = $match.Groups['path'].Value
             $skillDirectory = Split-Path -Parent $path
             $skillName = Split-Path -Leaf $skillDirectory
             Add-LogLineSkillPath -State $State -Skill $skillName -Path $path
+        }
+        if ($hasStructuredSkillEvent) {
+            $eventSkill = ""
+            $eventPath = ""
+            $invokedSkillMatch = [regex]::Match($scanText, '(?is)"type"\s*:\s*"skill\.invoked".*?"data"\s*:\s*\{.*?"name"\s*:\s*"(?<skill>[A-Za-z0-9][A-Za-z0-9:_\-]*)"')
+            if ($invokedSkillMatch.Success) {
+                $eventSkill = $invokedSkillMatch.Groups['skill'].Value
+                $invokedPathMatch = [regex]::Match($scanText, '(?is)"type"\s*:\s*"skill\.invoked".*?"data"\s*:\s*\{.*?"path"\s*:\s*"(?<path>(?:[^"\\]|\\.)*SKILL\.md)"')
+                if ($invokedPathMatch.Success) {
+                    $eventPath = $invokedPathMatch.Groups['path'].Value.Replace('\\', '\')
+                }
+            } elseif ($scanText.Contains('skills.selected_skill_instructions')) {
+                $nameMatch = $skillTagNameRx.Match($scanText)
+                if ($nameMatch.Success) { $eventSkill = $nameMatch.Groups[1].Value }
+                $pathMatch = $skillTagPathRx.Match($scanText)
+                if ($pathMatch.Success) { $eventPath = $pathMatch.Groups['path'].Value.Replace('\\', '\').Trim() }
+            }
+            if ($eventSkill) {
+                if ($eventPath -and (Test-Path -LiteralPath $eventPath -PathType Leaf)) {
+                    Register-DiscoveredSkillSource -Skill $eventSkill -SkillPath $eventPath
+                }
+                if ($counts.ContainsKey($eventSkill) -or ($eventPath -and (Test-Path -LiteralPath $eventPath -PathType Leaf))) {
+                    Add-LogLineSkillName -State $State -Skill $eventSkill
+                    if ($eventPath) { Add-LogLineSkillPath -State $State -Skill $eventSkill -Path $eventPath }
+                }
+            }
         }
         if ($hasCommandToken) {
             Add-ChunkedExplicitSkillCommands -State $State -Text $scanText
@@ -1623,6 +1660,73 @@ function Get-ExplicitSkillCommands {
     return @($commands | Select-Object -Unique)
 }
 
+function Add-StructuredSkillEvent {
+    param(
+        [System.Collections.Generic.List[string]]$Skills,
+        [string]$Line,
+        [object]$Record = $null
+    )
+
+    if (-not $Line -or (-not $Line.Contains('skills.selected_skill_instructions') -and -not $Line.Contains('skill.invoked'))) {
+        return
+    }
+
+    $eventRecord = $Record
+    if ($null -eq $eventRecord) {
+        try {
+            $eventRecord = $Line | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            return
+        }
+    }
+
+    if ([string]$eventRecord.type -eq "skill.invoked" -and $eventRecord.data) {
+        $skill = [string]$eventRecord.data.name
+        $path = [string]$eventRecord.data.path
+        if ($skill) {
+            if ($path -and (Test-Path -LiteralPath $path -PathType Leaf)) {
+                Register-DiscoveredSkillSource -Skill $skill -SkillPath $path
+            }
+            if ($counts.ContainsKey($skill) -or ($path -and (Test-Path -LiteralPath $path -PathType Leaf))) {
+                [void]$Skills.Add($skill)
+            }
+        }
+        return
+    }
+
+    $metadata = $null
+    if ($eventRecord.payload -and $eventRecord.payload.internal_chat_message_metadata_passthrough) {
+        $metadata = $eventRecord.payload.internal_chat_message_metadata_passthrough
+    } elseif ($eventRecord.internal_chat_message_metadata_passthrough) {
+        $metadata = $eventRecord.internal_chat_message_metadata_passthrough
+    }
+    if (-not $metadata -or -not @($metadata.content_item_kinds | Where-Object { [string]$_ -eq "skills.selected_skill_instructions" }).Count) {
+        return
+    }
+
+    $texts = [System.Collections.Generic.List[string]]::new()
+    $content = if ($eventRecord.payload -and $eventRecord.payload.content) { $eventRecord.payload.content } elseif ($eventRecord.content) { $eventRecord.content } else { @() }
+    foreach ($part in @($content)) {
+        if ($part.text -is [string]) { [void]$texts.Add($part.text) }
+    }
+
+    foreach ($text in @($texts)) {
+        $path = ""
+        $pathMatch = $skillTagPathRx.Match($text)
+        if ($pathMatch.Success) { $path = $pathMatch.Groups['path'].Value.Replace('\\', '\').Trim() }
+        foreach ($match in $skillTagNameRx.Matches($text)) {
+            $skill = $match.Groups[1].Value
+            if (-not $skill) { continue }
+            if ($path -and (Test-Path -LiteralPath $path -PathType Leaf)) {
+                Register-DiscoveredSkillSource -Skill $skill -SkillPath $path
+            }
+            if ($counts.ContainsKey($skill) -or ($path -and (Test-Path -LiteralPath $path -PathType Leaf))) {
+                [void]$Skills.Add($skill)
+            }
+        }
+    }
+}
+
 function Test-SkillReadLine {
     param([string]$Line)
     if (-not $Line.Contains('SKILL.md')) { return $false }
@@ -1940,6 +2044,8 @@ foreach ($src in $activeSources) {
                         foreach ($cmd in Get-ExplicitSkillCommands -Line $line) {
                             [void]$lineSkills.Add($cmd)
                         }
+
+                        Add-StructuredSkillEvent -Skills $lineSkills -Line $line
 
                         if (Test-SkillReadLine $line) {
                             foreach ($m in $skillFileReadRx.Matches($line)) {

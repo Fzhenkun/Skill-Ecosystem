@@ -83,14 +83,18 @@ try {
         $env:APPDATA = $priorAppData
         $env:LOCALAPPDATA = $priorLocalAppData
     }
-    if ($secondExitCode -eq 0) {
-        throw "Second extracted package incorrectly reused the first package's server."
+    if ($secondExitCode -ne 0) {
+        throw "Second extracted package failed to replace the first package's Skill Tracker server. Output: $($secondOutput | Out-String)"
     }
-    if (($secondOutput | Out-String) -notmatch "Port $port is already used") {
-        throw "Second package did not report a clear port conflict."
+    if (($secondOutput | Out-String) -notmatch "Replacing an existing Skill Tracker server on port $port") {
+        throw "Second package did not report Skill Tracker server replacement."
+    }
+    $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port/index.html" -UseBasicParsing -TimeoutSec 5
+    if ($response.StatusCode -ne 200 -or $response.Headers["X-Skill-Tracker-Server"] -ne "1") {
+        throw "Replacement server did not respond as a Skill Tracker server."
     }
 
-    Write-Host "Dashboard cross-package port conflict test passed."
+    Write-Host "Dashboard cross-package server replacement test passed."
 } finally {
     Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
         Where-Object { $_.CommandLine -and $_.CommandLine.Contains($tempRoot) } |
