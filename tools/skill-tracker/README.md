@@ -122,6 +122,7 @@ An `.exe` wrapper is optional later, mainly for one-click onboarding. It is not 
 | Adaptive tool radar | Rescans installed tools on launch and watcher cycles, hides deleted tools from the current list, records add/remove transitions, and surfaces bounded candidates for future adapters. |
 | GitHub radar | Searches public GitHub repositories, checks repository freshness, latest release, and API rate limit state. |
 | Anonymous export | Exports privacy-safe reports without real session IDs, local paths, raw skill names, or full descriptions. |
+| Local skill sync | Copies repository `skills/` into the local Codex, Copilot, and Claude skill directories; existing skill folders are replaced. |
 | Built-in manual | Explains every dashboard section inside the app, because many GitHub users do not read README files first. |
 
 ### Automatic local skill summaries
@@ -231,6 +232,14 @@ Running `collect.ps1` generates or updates these files under the configured `out
 - `dashboard/skill_catalog.js`
 - `dashboard/tool_report.json`
 - `dashboard/tool_report.js`
+
+From the **技能字典** view, click **同步到本机** to copy every repository skill with a `SKILL.md` from the project-level `skills/` directory into:
+
+- `~/.codex/skills`
+- `~/.copilot/skills`
+- `~/.claude/skills`
+
+The destination skill folder is created when missing. When it already exists, the whole folder is replaced so nested `references/`, `scripts/`, `examples/`, and `agents/` files stay in sync. The operation is local-only and does not upload skill contents.
 
 These real local telemetry files are ignored by Git on purpose. They may contain private session IDs, local paths, and internal skill metadata. The public demo data is `dashboard/demo_data.js`.
 

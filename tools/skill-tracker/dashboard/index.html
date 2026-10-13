@@ -3283,6 +3283,7 @@ button.catalog-stat.active {
               <span class="sr-only">搜索技能字典</span>
               <input id="catalogSearch" type="search" placeholder="搜索 skill / 中文说明">
             </label>
+            <button type="button" class="action-button" id="syncLocalSkills">同步到本机</button>
             <button type="button" class="action-button" id="exportCatalog">导出 JSON</button>
           </div>
         </div>
@@ -3793,6 +3794,7 @@ button.catalog-stat.active {
     catalogSummary: document.getElementById("catalogSummary"),
     catalogList: document.getElementById("catalogList"),
     catalogPager: document.getElementById("catalogPager"),
+    syncLocalSkills: document.getElementById("syncLocalSkills"),
     exportCatalog: document.getElementById("exportCatalog"),
     sessionModal: document.getElementById("sessionModal"),
     sessionModalClose: document.getElementById("sessionModalClose"),
@@ -3917,6 +3919,7 @@ button.catalog-stat.active {
       renderActionLab();
     });
 
+    els.syncLocalSkills.addEventListener("click", syncLocalSkills);
     els.exportCatalog.addEventListener("click", exportCatalogJson);
     els.exportAnonymous.addEventListener("click", exportAnonymousReport);
     els.exportActionIssues.addEventListener("click", exportActionIssues);
@@ -6320,6 +6323,34 @@ button.catalog-stat.active {
       };
     });
     downloadJson("skill_catalog.json", payload);
+  }
+
+  async function syncLocalSkills() {
+    var button = els.syncLocalSkills;
+    var originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = "同步中...";
+    try {
+      var response = await fetch("/api/local-skills/sync", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || data.error || "同步失败");
+      }
+      button.textContent = "已同步";
+      window.setTimeout(function () {
+        button.textContent = originalText;
+        button.disabled = false;
+      }, 2600);
+      alert("已从仓库 skills 同步 " + (data.skill_count || 0) + " 个 skill 到 Codex / Copilot / Claude，本地共写入 " + (data.item_count || 0) + " 项。");
+    } catch (error) {
+      button.textContent = originalText;
+      button.disabled = false;
+      alert("同步到本机失败：" + (error && error.message ? error.message : error));
+    }
   }
 
   function exportAnonymousReport() {

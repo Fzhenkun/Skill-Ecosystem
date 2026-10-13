@@ -72,6 +72,7 @@ $GeneratedDataFiles = @(
     "tool_report.js"
 )
 $CollectorTriggerPath = Join-Path $DataDir ".collector.trigger"
+$RepositorySkillsRoot = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Root) "..\skills"))
 
 function Start-SkillTrackerPowerShell {
     param(
@@ -351,6 +352,70 @@ function Stop-ListeningProcessesOnPort {
     return $remainingTargetPids.Count -eq 0 -and -not (Test-AnyHttpServer -ListenPort $ListenPort)
 }
 
+function Get-LocalSkillTargets {
+    $userHomePath = if ($env:USERPROFILE) { $env:USERPROFILE } elseif ($env:HOME) { $env:HOME } else { "" }
+    if (-not $userHomePath) { return @() }
+    return @(
+        [PSCustomObject]@{ tool = "Codex";   path = (Join-Path (Join-Path $userHomePath ".codex") "skills") },
+        [PSCustomObject]@{ tool = "Copilot"; path = (Join-Path (Join-Path $userHomePath ".copilot") "skills") },
+        [PSCustomObject]@{ tool = "Claude";  path = (Join-Path (Join-Path $userHomePath ".claude") "skills") }
+    )
+}
+
+function Sync-RepositorySkillsToLocalTargets {
+    if (-not (Test-Path -LiteralPath $RepositorySkillsRoot -PathType Container)) {
+        throw "Repository skills directory not found: $RepositorySkillsRoot"
+    }
+
+    $skillDirs = @(Get-ChildItem -LiteralPath $RepositorySkillsRoot -Directory | Where-Object {
+        Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md") -PathType Leaf
+    })
+    if ($skillDirs.Count -eq 0) {
+        throw "No skill directories with SKILL.md were found under $RepositorySkillsRoot"
+    }
+
+    $results = @()
+    foreach ($target in Get-LocalSkillTargets) {
+        New-Item -ItemType Directory -Path $target.path -Force | Out-Null
+        $targetRoot = [System.IO.Path]::GetFullPath($target.path).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar
+        ) + [System.IO.Path]::DirectorySeparatorChar
+        $pathComparison = if ($RunningOnWindows) {
+            [System.StringComparison]::OrdinalIgnoreCase
+        } else {
+            [System.StringComparison]::Ordinal
+        }
+        foreach ($skillDir in $skillDirs) {
+            $destination = Join-Path $target.path $skillDir.Name
+            $destinationFullPath = [System.IO.Path]::GetFullPath($destination)
+            if (-not ($destinationFullPath + [System.IO.Path]::DirectorySeparatorChar).StartsWith($targetRoot, $pathComparison)) {
+                throw "Refusing to write outside local skill target: $destinationFullPath"
+            }
+            $action = if (Test-Path -LiteralPath $destination) { "replaced" } else { "created" }
+            if (Test-Path -LiteralPath $destination) {
+                Remove-Item -LiteralPath $destination -Recurse -Force
+            }
+            Copy-Item -LiteralPath $skillDir.FullName -Destination $destination -Recurse -Force
+            $results += [PSCustomObject]@{
+                tool = $target.tool
+                skill = $skillDir.Name
+                action = $action
+                path = $destination
+            }
+        }
+    }
+
+    return [PSCustomObject]@{
+        success = $true
+        source = $RepositorySkillsRoot
+        target_count = @(Get-LocalSkillTargets).Count
+        skill_count = $skillDirs.Count
+        item_count = $results.Count
+        results = $results
+    }
+}
+
 function Start-NoCacheServer {
     param([int]$ListenPort)
 
@@ -366,7 +431,7 @@ function Start-NoCacheServer {
         $context = $listener.GetContext()
         try {
             $rawPath = [Uri]::UnescapeDataString($context.Request.Url.AbsolutePath)
-            if ($rawPath -eq "/api/sync" -or $rawPath -eq "/api/watcher-status" -or $rawPath.StartsWith("/api/shortcut/")) {
+            if ($rawPath -eq "/api/sync" -or $rawPath -eq "/api/watcher-status" -or $rawPath -eq "/api/local-skills/sync" -or $rawPath.StartsWith("/api/shortcut/")) {
                 $method = $context.Request.HttpMethod.ToUpperInvariant()
                 $shortcutScript = Join-Path $Root "scripts\manage-shortcut.ps1"
                 $bytes = @()
@@ -404,6 +469,11 @@ function Start-NoCacheServer {
                     }
                     if (-not $resObj.success) { $context.Response.StatusCode = 503 }
                     $bytes = [System.Text.Encoding]::UTF8.GetBytes(($resObj | ConvertTo-Json -Compress))
+                } elseif ($rawPath -eq "/api/local-skills/sync" -and ($method -eq "POST" -or $method -eq "GET")) {
+                    $context.Response.StatusCode = 200
+                    $context.Response.ContentType = "application/json; charset=utf-8"
+                    $resObj = Sync-RepositorySkillsToLocalTargets
+                    $bytes = [System.Text.Encoding]::UTF8.GetBytes(($resObj | ConvertTo-Json -Depth 6 -Compress))
                 } elseif ($rawPath -eq "/api/shortcut/status") {
                     $context.Response.StatusCode = 200
                     $context.Response.ContentType = "application/json; charset=utf-8"
@@ -478,7 +548,22 @@ function Start-NoCacheServer {
             $context.Response.ContentLength64 = $bytes.Length
             $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
         } catch {
-            try { $context.Response.StatusCode = 500 } catch { }
+            try {
+                $context.Response.StatusCode = 500
+                if ([string]$context.Request.Url.AbsolutePath -like "/api/*") {
+                    $context.Response.ContentType = "application/json; charset=utf-8"
+                    $errorObj = [PSCustomObject]@{
+                        success = $false
+                        error = [string]$_.Exception.Message
+                    }
+                    $bytes = [System.Text.Encoding]::UTF8.GetBytes(($errorObj | ConvertTo-Json -Compress))
+                    $context.Response.Headers["X-Skill-Tracker-Server"] = "1"
+                    $context.Response.Headers["X-Skill-Tracker-Instance"] = $ServerInstanceId
+                    $context.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+                    $context.Response.ContentLength64 = $bytes.Length
+                    $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+                }
+            } catch { }
         } finally {
             $context.Response.OutputStream.Close()
         }
@@ -669,8 +754,9 @@ if (-not (Test-SkillTrackerServer -ListenPort $Port)) {
 # Auto-ensure desktop shortcut on initial launch
 $shortcutScript = Join-Path $PSScriptRoot "scripts\manage-shortcut.ps1"
 if ($RunningOnWindows -and (Test-Path -LiteralPath $shortcutScript)) {
-    $desktopLnk = Join-Path ([Environment]::GetFolderPath("Desktop")) "技能追踪器.lnk"
-    if (-not (Test-Path -LiteralPath $desktopLnk)) {
+    $desktopPath = [Environment]::GetFolderPath("Desktop")
+    $desktopLnk = if ($desktopPath) { Join-Path $desktopPath "技能追踪器.lnk" } else { "" }
+    if ($desktopLnk -and -not (Test-Path -LiteralPath $desktopLnk)) {
         & $PowerShellExecutable -NoLogo -NoProfile -ExecutionPolicy Bypass -File $shortcutScript -Action CreateDesktopShortcut -CreateStartMenu | Out-Null
         Write-Host "已自动在您的桌面创建【技能追踪器】快捷方式！"
     }
