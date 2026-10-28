@@ -1,6 +1,7 @@
 ---
 name: project-structure-hardening
 description: "MUST USE when creating a new project or preparing an existing repository to use shared agent instructions and specs: AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, .agents/skills, agent-os/standards, openspec, or packages/*/AGENTS.md. Use when the structure is missing, partial, inconsistent, or needs an idempotent audit. Do not use for ordinary application coding or for overwriting existing project rules."
+key: 固化目录结构，固化项目结构
 ---
 
 # 固化项目目录结构

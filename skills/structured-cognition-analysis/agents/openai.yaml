@@ -1,4 +1,4 @@
 interface:
   display_name: "Structured Cognition Analysis"
-  short_description: "Analyze any new thing with an 8-dimension scaffold and produce an HTML report"
-  default_prompt: "Use $structured-cognition-analysis to analyze this subject by its essence and output an HTML report."
+  short_description: "Map context, explain mechanisms, verify boundaries, and write Markdown"
+  default_prompt: "Use $structured-cognition-analysis with the unified scalable flow: scope, map context, explain key mechanisms, trace anomalies, analyze boundaries, verify with practice, and output Markdown."

@@ -1,0 +1,106 @@
+{
+  "title": "C++ 规范与 Google C++ Style Guide 要点分析",
+  "subtitle": "从全局协作目标到关键规则的机制、边界、历史原因和验证方式",
+  "language": "zh",
+  "essence": "C++ 规范通过统一依赖边界、降低隐式行为、明确资源所有权和稳定代码布局来降低长期协作成本。",
+  "dimensions": [
+    {
+      "id": 1,
+      "name": "基础假设与隐含前提",
+      "applicable": true,
+      "summary": "规范假设代码由多人长期维护，并且一致的结构能降低阅读、误用和变更成本。",
+      "points": [
+        {"text": "规则价值依赖项目持续采用和工具执行，而不是单次人工检查。", "type": "inference", "confidence": "high"},
+        {"text": "项目级约定、构建约束和 ABI 兼容要求可能优先于通用 Google 风格。", "type": "fact", "confidence": "high"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "依据与基本原理",
+      "applicable": true,
+      "summary": "规则把隐式行为转成显式接口，把依赖和生命周期放到编译器及审查者可见的位置。",
+      "points": [
+        {"text": "explicit、const、override 和命名转换分别减少隐式构造、状态误解、重写签名错误和不透明转换。", "type": "fact", "confidence": "high"},
+        {"text": "稳定格式和 include 顺序主要降低协作 diff 和故障定位成本。", "type": "inference", "confidence": "high"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "目标",
+      "applicable": true,
+      "summary": "目标是让读者快速理解代码，让工具更早发现错误，让变更更容易审查。",
+      "points": [
+        {"text": "规范同时服务于可读性、可编译性、语义安全和长期维护。", "type": "inference", "confidence": "high"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "主要矛盾",
+      "applicable": true,
+      "summary": "核心矛盾是 C++ 的表达能力和历史兼容性很强，但隐式规则、预处理器和手动生命周期也很多。",
+      "points": [
+        {"text": "规范在灵活性、历史兼容和一致性之间选择更可预测的接口和布局。", "type": "inference", "confidence": "high"},
+        {"text": "规则过度机械化会损害外部 ABI、生成代码或有意的性能设计，因此需要项目例外和人工确认。", "type": "inference", "confidence": "high"}
+      ]
+    },
+    {
+      "id": 5,
+      "name": "主要内容",
+      "applicable": true,
+      "summary": "主要内容包括文件和 include、格式、命名、命名空间、类接口、所有权、现代 C++ 和控制流。",
+      "points": [
+        {"text": "头文件自包含、保护宏、include 分组和稳定命名构成依赖与协作基础。", "type": "fact", "confidence": "high"},
+        {"text": "RAII、智能指针、nullptr、命名转换、explicit、const 和 override 是语义安全重点。", "type": "fact", "confidence": "high"}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "实现手段",
+      "applicable": true,
+      "summary": "先扫描项目约束，再运行格式和启发式检查，最后由人工分析所有权、接口和历史例外。",
+      "points": [
+        {"text": "clang-format 适合机械格式，clang-tidy/cpplint 适合静态规则，本 skill 脚本用于无依赖的初筛。", "type": "fact", "confidence": "high"},
+        {"text": "自动修正应限制在 tab、行尾空白和明确的 NULL 替换等低风险变更。", "type": "inference", "confidence": "high"}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "边界与代价",
+      "applicable": true,
+      "summary": "风格规范不能证明程序正确，也不能替代编译、静态分析、安全审查和测试。",
+      "points": [
+        {"text": "include 顺序、裸指针、行宽和命名检查存在启发式误报，需要人工确认。", "type": "fact", "confidence": "high"},
+        {"text": "统一规则会带来格式迁移和历史代码改造成本，公共 ABI、第三方 API、生成代码和平台兼容层应保留明确例外。", "type": "inference", "confidence": "high"}
+      ]
+    },
+    {
+      "id": 8,
+      "name": "演化与验证",
+      "applicable": true,
+      "summary": "许多规则源于旧工具链、窄终端、预处理器和隐式转换问题，今天仍以协作和可验证性为理由保留。",
+      "points": [
+        {"text": "80 列与早期终端、打印和并排 diff 的限制有关，现今更像可读性启发式而非硬限制。", "type": "inference", "confidence": "medium"},
+        {"text": "include guard 是传统预处理模型下的可移植保护方案，#pragma once 是常见但工具链相关的扩展。", "type": "fact", "confidence": "high"},
+        {"text": "异常规则应通过 git blame、引入提交、构建约束和 ABI/协议要求追溯，而不是直接重写。", "type": "inference", "confidence": "high"}
+      ]
+    }
+  ],
+  "conclusion": {
+    "stance": "先遵循项目规则并建立全局依赖地图，再用语义安全和资源所有权作为重点，最后处理格式和命名。",
+    "risks": [
+      "把启发式检查结果当成确定性错误",
+      "在没有历史和 ABI 上下文时修改公共接口或命名",
+      "只运行格式工具而没有编译、静态分析和测试验证"
+    ],
+    "open_questions": [
+      "目标项目是否有自己的 .clang-format、clang-tidy 或 cpplint 配置？",
+      "哪些目录属于生成代码、第三方代码或平台兼容层？",
+      "公共头文件是否需要保持 ABI、协议字段或脚本绑定兼容？"
+    ]
+  },
+  "sources": [
+    "D:\\projects\\Personal_blog_website\\input.png",
+    "cpp-code-style-reviewer/references/style-rules.md",
+    "cpp-code-style-reviewer/references/workflow.md"
+  ]
+}

@@ -23,16 +23,16 @@ Required:
 
 ## Layer 2: Errors and User Fixes / 错误现象与用户修复
 
-### E1 `ERROR: JSON must contain 'title' and a 'dimensions' list` or JSON decode error
+### E1 `ERROR: JSON must contain 'title' and a list of 'lenses' or 'dimensions'` or JSON decode error
 
 Agent fix: correct the JSON against `report-schema.md` without altering analysis content. Re-run the exact command.
 
 ### E2 `python` is not available
 
-Do not improvise. Tell the user, and offer a hand-authored single-file HTML in the same section order, stating it was not script-rendered. Show:
+Do not improvise. Tell the user, and offer a hand-authored Markdown report in the same section order, stating it was not script-rendered. Show:
 
 ```text
-Detected: Python is not available, so the report cannot be rendered by script.
+Detected: Python is not available, so the Markdown report cannot be rendered by script.
 Please install Python 3 or add it to PATH, then reply: 已修复
 ```
 
