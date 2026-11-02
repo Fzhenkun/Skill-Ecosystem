@@ -1,15 +1,21 @@
-"""Render a structured cognition analysis JSON file into a self-contained HTML report."""
+"""Render a structured cognition JSON file into a readable Markdown report."""
 
 import argparse
 import json
 import sys
-from html import escape
 from pathlib import Path
+
 
 LABELS = {
     "zh": {
+        "scope": "界定对象",
+        "map": "全局/上下文地图",
+        "mechanisms": "关键机制",
+        "anomalies": "反常点与历史追溯",
+        "boundaries": "边界与代价",
+        "verification": "实践验证",
+        "lenses": "分析透镜",
         "essence": "本质一句话",
-        "na": "不适用",
         "conclusion": "综合结论",
         "stance": "建议立场",
         "risks": "主要风险",
@@ -21,11 +27,16 @@ LABELS = {
         "high": "高",
         "medium": "中",
         "low": "低",
-        "conf": "置信度",
     },
     "en": {
+        "scope": "Scope",
+        "map": "Global/context map",
+        "mechanisms": "Key mechanisms",
+        "anomalies": "Anomalies and history",
+        "boundaries": "Boundaries and costs",
+        "verification": "Practice and verification",
+        "lenses": "Analytical lenses",
         "essence": "Essence in one sentence",
-        "na": "Not applicable",
         "conclusion": "Conclusion",
         "stance": "Recommended stance",
         "risks": "Key risks",
@@ -37,113 +48,148 @@ LABELS = {
         "high": "High",
         "medium": "Medium",
         "low": "Low",
-        "conf": "Confidence",
     },
 }
 
-CSS = """
-body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;margin:0;background:#f5f6f8;color:#1f2430;line-height:1.65}
-main{max-width:920px;margin:0 auto;padding:32px 20px 64px}
-h1{margin:0 0 4px;font-size:28px}.sub{color:#5b6475;margin-bottom:20px}
-.essence{background:#1f2f5c;color:#fff;border-radius:10px;padding:16px 20px;margin:16px 0 24px}
-.essence b{display:block;font-size:12px;opacity:.75;margin-bottom:4px}
-section.dim{background:#fff;border-radius:10px;padding:18px 22px;margin:14px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-section.dim.na{opacity:.65}
-h2{font-size:18px;margin:0 0 6px}.num{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:#3b5bdb;color:#fff;font-size:14px;margin-right:8px}
-.summary{font-weight:600;margin:4px 0 10px}
-ul{padding-left:20px;margin:6px 0}li{margin:6px 0}
-.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;color:#fff}
-.fact{background:#2f9e44}.inference{background:#e8890c}.speculation{background:#c92a2a}
-.conf{font-size:12px;color:#5b6475}
-.concl{background:#fff;border-left:5px solid #3b5bdb;border-radius:6px;padding:16px 22px;margin-top:24px}
-"""
+
+def label(lang, key):
+    return LABELS.get(lang, LABELS["zh"]).get(key, key)
 
 
-def tr(lang: str, key: str) -> str:
-    return LABELS[lang].get(key, key)
+def claim(text, kind="inference", confidence="medium"):
+    return f"- **{label('zh', kind)}**（置信度：{label('zh', confidence)}）：{text}"
 
 
-def render_list(items) -> str:
-    return "<ul>" + "".join(f"<li>{escape(str(i))}</li>" for i in items) + "</ul>"
+def bullet_list(items):
+    return "\n".join(f"- {item}" for item in items) if items else "- （无）"
 
 
-def render_dimension(dim: dict, lang: str) -> str:
-    applicable = dim.get("applicable", True)
-    parts = [
-        f'<section class="dim{"" if applicable else " na"}">',
-        f'<h2><span class="num">{escape(str(dim.get("id", "")))}</span>{escape(dim.get("name", ""))}</h2>',
-    ]
-    if not applicable:
-        parts.append(f'<p><b>{tr(lang, "na")}</b>: {escape(dim.get("reason", ""))}</p>')
-    else:
-        if dim.get("summary"):
-            parts.append(f'<div class="summary">{escape(dim["summary"])}</div>')
-        parts.append("<ul>")
-        for p in dim.get("points", []):
-            ptype = p.get("type", "inference")
-            if ptype not in ("fact", "inference", "speculation"):
-                ptype = "inference"
-            conf = p.get("confidence", "medium")
-            parts.append(
-                f'<li><span class="tag {ptype}">{tr(lang, ptype)}</span>'
-                f'{escape(p.get("text", ""))} '
-                f'<span class="conf">({tr(lang, "conf")}: {escape(tr(lang, conf))})</span></li>'
-            )
-        parts.append("</ul>")
-    parts.append("</section>")
-    return "".join(parts)
+def render_map(context_map):
+    if not context_map:
+        return "_未提供地图；对简单对象仅保留最小上下文。_\n"
+    lines = []
+    for key, title in (
+        ("scope", "范围"),
+        ("components", "组件"),
+        ("actors", "参与者/所有者"),
+        ("flows", "输入输出与流程"),
+        ("dependencies", "依赖"),
+        ("lifecycle", "生命周期"),
+        ("failure_surface", "失效面"),
+    ):
+        value = context_map.get(key)
+        if not value:
+            continue
+        lines.append(f"**{title}**")
+        if isinstance(value, list):
+            lines.append(bullet_list(value))
+        else:
+            lines.append(str(value))
+    return "\n\n".join(lines) + "\n"
 
 
-def render(data: dict) -> str:
+def render_claims(points):
+    return "\n".join(
+        claim(p.get("text", ""), p.get("type", "inference"), p.get("confidence", "medium"))
+        for p in points
+    ) or "- （无具体结论）"
+
+
+def render(data):
     lang = data.get("language", "zh")
-    if lang not in LABELS:
-        lang = "zh"
-    body = [f'<h1>{escape(data["title"])}</h1>']
+    lines = [f"# {data['title']}", ""]
     if data.get("subtitle"):
-        body.append(f'<div class="sub">{escape(data["subtitle"])}</div>')
+        lines += [data["subtitle"], ""]
+    if data.get("complexity"):
+        lines += [f"**调查尺度：** `{data['complexity']}`", ""]
+    if data.get("scope"):
+        lines += [f"## {label(lang, 'scope')}", "", data["scope"], ""]
     if data.get("essence"):
-        body.append(f'<div class="essence"><b>{tr(lang, "essence")}</b>{escape(data["essence"])}</div>')
-    body.extend(render_dimension(d, lang) for d in data["dimensions"])
+        lines += [f"## {label(lang, 'essence')}", "", data["essence"], ""]
 
-    concl = data.get("conclusion")
-    if concl:
-        block = [f'<div class="concl"><h2>{tr(lang, "conclusion")}</h2>']
-        if concl.get("stance"):
-            block.append(f'<p><b>{tr(lang, "stance")}</b>: {escape(concl["stance"])}</p>')
-        if concl.get("risks"):
-            block.append(f'<b>{tr(lang, "risks")}</b>{render_list(concl["risks"])}')
-        if concl.get("open_questions"):
-            block.append(f'<b>{tr(lang, "open")}</b>{render_list(concl["open_questions"])}')
-        block.append("</div>")
-        body.append("".join(block))
+    if "context_map" in data:
+        lines += [f"## {label(lang, 'map')}", "", render_map(data.get("context_map")), ""]
+
+    mechanisms = data.get("key_mechanisms", [])
+    if mechanisms:
+        lines += [f"## {label(lang, 'mechanisms')}", ""]
+        for i, item in enumerate(mechanisms, 1):
+            lines += [f"### {i}. {item.get('name', '未命名机制')}"]
+            if item.get("importance"):
+                lines += [f"**为何关键：** {item['importance']}", ""]
+            if item.get("chain"):
+                lines += [f"**因果链：** `{item['chain']}`", ""]
+            lines += [render_claims(item.get("points", [])), ""]
+
+    anomalies = data.get("anomalies", [])
+    if anomalies:
+        lines += [f"## {label(lang, 'anomalies')}", ""]
+        for i, item in enumerate(anomalies, 1):
+            lines += [f"### {i}. {item.get('observation', '未命名反常点')}"]
+            if item.get("evidence"):
+                lines += ["**证据：**", bullet_list(item["evidence"]), ""]
+            if item.get("historical_explanation"):
+                lines += [f"**历史解释：** {item['historical_explanation']}", ""]
+            if item.get("hypotheses"):
+                lines += ["**待证假设：**", bullet_list(item["hypotheses"]), ""]
+            if item.get("current_constraint"):
+                lines += [f"**当前约束：** {item['current_constraint']}", ""]
+
+    if data.get("boundaries"):
+        lines += [f"## {label(lang, 'boundaries')}", "", render_claims(data["boundaries"]), ""]
+
+    if data.get("verification"):
+        lines += [f"## {label(lang, 'verification')}", ""]
+        for i, item in enumerate(data["verification"], 1):
+            lines += [f"### {i}. {item.get('check', '未命名检查')}"]
+            lines += [f"**预期：** {item.get('expected', '未说明')}"]
+            lines += [f"**结果：** {item.get('result', '未执行')}"]
+            lines += [f"**限制：** {item.get('limits', '未说明')}", ""]
+
+    # Backward compatibility with the original eight-dimension input.
+    dimensions = data.get("dimensions", [])
+    lenses = data.get("lenses", []) or dimensions
+    if lenses:
+        lines += [f"## {label(lang, 'lenses')}", ""]
+        for i, item in enumerate(lenses, 1):
+            name = item.get("name", f"透镜 {i}")
+            lines += [f"### {item.get('id', i)}. {name}"]
+            if item.get("summary"):
+                lines += [item["summary"], ""]
+            if item.get("applicable") is False:
+                lines += [f"_不适用：{item.get('reason', '未说明')}_", ""]
+            else:
+                lines += [render_claims(item.get("points", [])), ""]
+
+    conclusion = data.get("conclusion", {})
+    if conclusion:
+        lines += [f"## {label(lang, 'conclusion')}", ""]
+        if conclusion.get("stance"):
+            lines += [f"**{label(lang, 'stance')}：** {conclusion['stance']}", ""]
+        if conclusion.get("risks"):
+            lines += [f"**{label(lang, 'risks')}：**", bullet_list(conclusion["risks"]), ""]
+        if conclusion.get("open_questions"):
+            lines += [f"**{label(lang, 'open')}：**", bullet_list(conclusion["open_questions"]), ""]
 
     if data.get("sources"):
-        body.append(f'<div class="concl"><h2>{tr(lang, "sources")}</h2>{render_list(data["sources"])}</div>')
-
-    return (
-        f'<!DOCTYPE html><html lang="{lang}"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        f'<title>{escape(data["title"])}</title><style>{CSS}</style></head>'
-        f'<body><main>{"".join(body)}</main></body></html>'
-    )
+        lines += [f"## {label(lang, 'sources')}", "", bullet_list(data["sources"]), ""]
+    return "\n".join(lines).rstrip() + "\n"
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, help="Path to analysis JSON")
-    parser.add_argument("--output", required=True, help="Path to output HTML")
+    parser.add_argument("--output", required=True, help="Path to output Markdown")
     args = parser.parse_args()
-
     try:
         data = json.loads(Path(args.input).read_text(encoding="utf-8-sig"))
-        if "title" not in data or not isinstance(data.get("dimensions"), list):
-            raise ValueError("JSON must contain 'title' and a 'dimensions' list")
-        html = render(data)
-    except (OSError, ValueError) as exc:
+        if "title" not in data or not isinstance(data.get("dimensions", data.get("lenses", [])), list):
+            raise ValueError("JSON must contain 'title' and a list of 'lenses' or 'dimensions'")
+        markdown = render(data)
+        Path(args.output).write_text(markdown, encoding="utf-8")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-
-    Path(args.output).write_text(html, encoding="utf-8")
     print(f"Report written: {args.output}")
     return 0
 

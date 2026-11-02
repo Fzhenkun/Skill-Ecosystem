@@ -1,42 +1,61 @@
-# Framework: 8 Dimensions / 八维框架
+# Investigation Framework / 调查框架
 
-Use as a scaffold. Ask the habit questions: **assumptions, contradictions, boundaries, verification**.
+This is a single framework with adjustable scale. Ask the following questions in order.
 
-## 1. Foundational & hidden assumptions / 基石假设·隐性假设
-- What must be true for this to work? Which premises are stated vs. silently assumed?
-- If a premise were false, what collapses? (counterfactual test)
-- 它默认了哪些环境、人性、资源、规模前提？
+## 1. Scope / 界定对象
 
-## 2. Rationale / 依据·基本原理
-- Which principle, mechanism, or evidence makes it hold? Is it causal or merely correlational?
-- 因果机制是什么？证据强度如何？
+- What exactly is being analyzed?
+- What decision, learning goal, or risk is the user addressing?
+- What is in scope, out of scope, and supported by available evidence?
 
-## 3. Goal / 目标
-- Explicit goal vs. real incentive. Who defines success and by what metric?
-- 声称的目标与实际驱动是否一致？
+## 2. Global or Context Map / 全局或上下文地图
 
-## 4. Principal contradiction / 主要矛盾
-- What tension or pain point is it built to resolve? What trade-off does it choose a side on?
-- 它抓住的是主要矛盾还是次要矛盾？
+For complex subjects:
 
-## 5. Main content / 主要内容
-- What is it, concretely? Components, scope, vocabulary, key claims.
-- 是什么：组成、范围、核心主张。
+- Who are the actors and owners?
+- What are the components and responsibilities?
+- What enters, changes, and leaves the system?
+- How do data, control, money, or decisions flow?
+- What dependencies, lifecycle states, external constraints, and failure surfaces matter?
+- What timeline or version history might explain the present shape?
 
-## 6. Means & implementation / 主要手段·实现
-- How is it carried out? Steps, tools, mechanisms, prerequisites.
-- 怎么做：步骤、工具、前置条件。
+For simple subjects, answer the same questions at minimum scale: what it is, what it interacts with, what goes in, what comes out, and where it is used.
 
-## 7. Boundaries & costs / 边界与代价
-- Under which conditions does it fail? What are monetary, cognitive, social, opportunity costs?
-- What are the alternatives and why might they win?
-- 何时失效？代价？替代方案？
+## 3. Key Mechanisms / 关键机制
 
-## 8. Evolution & verification / 演化与验证
-- Origin and history; what it replaced. How can it be tested or falsified? Known counterexamples or failures?
-- 从何而来？如何验证？有哪些反例？
+For each selected mechanism, write:
 
-## Limits / 局限
-- High threshold: hidden assumptions are hard to excavate; list candidates and stress-test them.
-- Over-analysis risk: do not use on trivial subjects.
-- 门槛较高；对琐碎事物易过度分析。
+`condition/input -> mechanism -> state change or decision -> output/effect`
+
+Then answer:
+
+- Why is this mechanism central to the user’s question?
+- What assumption does it rely on?
+- What would be observable if the explanation were true?
+
+## 4. Anomaly and History / 反常点与历史
+
+- What looks irrational, overly complex, inconsistent, or broken?
+- Is the observation confirmed by code, tests, documents, logs, or behavior?
+- Could compatibility, migration, old incidents, ownership, performance, or external constraints explain it?
+- Which explanation is confirmed, which is only a hypothesis, and which constraints remain?
+
+## 5. Boundaries and Costs / 边界与代价
+
+- Where does it work and where does it fail?
+- What are the performance, memory, complexity, safety, operational, migration, and lock-in costs?
+- What alternative wins under a different constraint?
+- What misuse is likely even if the mechanism is technically correct?
+
+## 6. Practice and Verification / 实践与验证
+
+- What is the smallest reproduction, experiment, inspection, measurement, or scenario walkthrough?
+- What observation would support or falsify the claim?
+- What did the check actually establish, and what remains unknown?
+
+## 7. Synthesis / 综合
+
+- What is the essence in one sentence?
+- Which findings are facts and which are inferences?
+- What stance or action follows from the evidence?
+- What risks and open questions remain?
